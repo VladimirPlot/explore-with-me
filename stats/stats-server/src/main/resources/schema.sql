@@ -1,0 +1,9 @@
+DROP TABLE IF EXISTS endpoint_hit;
+
+CREATE TABLE endpoint_hit (
+    id BIGSERIAL PRIMARY KEY,
+    app VARCHAR(255) NOT NULL,
+    uri VARCHAR(255) NOT NULL,
+    ip VARCHAR(255) NOT NULL,
+    timestamp TIMESTAMP NOT NULL
+);
