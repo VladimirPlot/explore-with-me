@@ -12,6 +12,8 @@ import ru.practicum.dto.EndpointHitDto;
 import ru.practicum.dto.ViewStatsDto;
 import ru.practicum.service.StatsService;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -32,7 +34,12 @@ class StatsControllerTest {
 
     @Test
     void saveHit_shouldReturn201() throws Exception {
-        EndpointHitDto dto = new EndpointHitDto("test-app", "/test", "127.0.0.1", "2025-07-29 18:45:00");
+        EndpointHitDto dto = new EndpointHitDto(
+                "test-app",
+                "/test",
+                "127.0.0.1",
+                LocalDateTime.parse("2025-07-29 18:45:00", DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+        );
 
         mockMvc.perform(post("/hit")
                         .contentType(MediaType.APPLICATION_JSON)

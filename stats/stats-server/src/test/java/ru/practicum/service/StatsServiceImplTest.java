@@ -9,6 +9,8 @@ import ru.practicum.dto.EndpointHitDto;
 import ru.practicum.dto.ViewStatsDto;
 import ru.practicum.repository.StatsRepository;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -78,7 +80,12 @@ class StatsServiceImplTest {
     @Test
     @DisplayName("saveHit: должен сохранить обращение")
     void saveHit_Should_Save() {
-        EndpointHitDto dto = new EndpointHitDto("app", "/uri", "192.168.0.1", "2025-01-01 12:00:00");
+        EndpointHitDto dto = new EndpointHitDto(
+                "app",
+                "/uri",
+                "192.168.0.1",
+                LocalDateTime.parse("2025-01-01 12:00:00", DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+        );
 
         service.saveHit(dto);
 
