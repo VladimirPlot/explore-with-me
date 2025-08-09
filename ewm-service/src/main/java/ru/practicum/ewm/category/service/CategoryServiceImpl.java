@@ -8,10 +8,9 @@ import ru.practicum.ewm.category.dto.NewCategoryDto;
 import ru.practicum.ewm.category.mapper.CategoryMapper;
 import ru.practicum.ewm.category.model.Category;
 import ru.practicum.ewm.category.repository.CategoryRepository;
+import ru.practicum.ewm.exceptions.NotFoundException;
 
 import java.util.List;
-import java.util.NoSuchElementException;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -20,14 +19,15 @@ public class CategoryServiceImpl implements CategoryService {
 
     @Override
     public CategoryDto create(NewCategoryDto dto) {
-        Category category = categoryRepository.save(CategoryMapper.toEntity(dto));
-        return CategoryMapper.toDto(category);
+        Category entity = CategoryMapper.toEntity(dto);
+        Category saved = categoryRepository.save(entity);
+        return CategoryMapper.toDto(saved);
     }
 
     @Override
     public CategoryDto update(Long id, NewCategoryDto dto) {
         Category category = categoryRepository.findById(id)
-                .orElseThrow(() -> new NoSuchElementException("Category not found"));
+                .orElseThrow(() -> new NotFoundException("Category not found"));
         category.setName(dto.getName());
         return CategoryMapper.toDto(categoryRepository.save(category));
     }
@@ -40,15 +40,17 @@ public class CategoryServiceImpl implements CategoryService {
     @Override
     public List<CategoryDto> findAll(int from, int size) {
         PageRequest page = PageRequest.of(from / size, size);
-        return categoryRepository.findAll(page).stream()
+        return categoryRepository.findAll(page)
+                .getContent()
+                .stream()
                 .map(CategoryMapper::toDto)
-                .collect(Collectors.toList());
+                .toList();
     }
 
     @Override
     public CategoryDto findById(Long id) {
         return categoryRepository.findById(id)
                 .map(CategoryMapper::toDto)
-                .orElseThrow(() -> new NoSuchElementException("Category not found"));
+                .orElseThrow(() -> new NotFoundException("Category not found"));
     }
 }

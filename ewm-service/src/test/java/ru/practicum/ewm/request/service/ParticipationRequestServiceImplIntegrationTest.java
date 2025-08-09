@@ -12,6 +12,7 @@ import ru.practicum.ewm.event.model.Event;
 import ru.practicum.ewm.event.model.EventState;
 import ru.practicum.ewm.event.model.Location;
 import ru.practicum.ewm.event.repository.EventRepository;
+import ru.practicum.ewm.exceptions.ConflictException;
 import ru.practicum.ewm.request.dto.ParticipationRequestDto;
 import ru.practicum.ewm.request.repository.ParticipationRequestRepository;
 import ru.practicum.ewm.user.model.User;
@@ -96,7 +97,7 @@ class ParticipationRequestServiceImplIntegrationTest {
 
     @Test
     void create_shouldFail_whenUserIsInitiator() {
-        IllegalStateException ex = assertThrows(IllegalStateException.class,
+        ConflictException ex = assertThrows(ConflictException.class,
                 () -> service.create(initiator.getId(), publishedEvent.getId()));
 
         assertEquals("Cannot request participation in own event", ex.getMessage());
@@ -104,7 +105,7 @@ class ParticipationRequestServiceImplIntegrationTest {
 
     @Test
     void create_shouldFail_whenEventNotPublished() {
-        IllegalStateException ex = assertThrows(IllegalStateException.class,
+        ConflictException ex = assertThrows(ConflictException.class,
                 () -> service.create(requester.getId(), unpublishedEvent.getId()));
 
         assertEquals("Event is not published", ex.getMessage());
@@ -122,7 +123,7 @@ class ParticipationRequestServiceImplIntegrationTest {
     void cancel_shouldFail_whenWrongUser() {
         ParticipationRequestDto created = service.create(requester.getId(), publishedEvent.getId());
 
-        assertThrows(IllegalArgumentException.class,
+        assertThrows(ConflictException.class,
                 () -> service.cancel(initiator.getId(), created.getId()));
     }
 
@@ -167,7 +168,7 @@ class ParticipationRequestServiceImplIntegrationTest {
     void getEventRequests_shouldFail_whenUserNotInitiator() {
         service.create(requester.getId(), publishedEvent.getId());
 
-        assertThrows(IllegalArgumentException.class,
+        assertThrows(ConflictException.class,
                 () -> service.getEventRequests(requester.getId(), publishedEvent.getId()));
     }
 
@@ -193,7 +194,7 @@ class ParticipationRequestServiceImplIntegrationTest {
 
         service.confirmRequest(initiator.getId(), publishedEvent.getId(), r1.getId());
 
-        assertThrows(IllegalStateException.class,
+        assertThrows(ConflictException.class,
                 () -> service.confirmRequest(initiator.getId(), publishedEvent.getId(), r2.getId()));
     }
 
@@ -211,7 +212,7 @@ class ParticipationRequestServiceImplIntegrationTest {
     void rejectRequest_shouldFail_whenUserNotInitiator() {
         ParticipationRequestDto request = service.create(requester.getId(), publishedEvent.getId());
 
-        assertThrows(IllegalArgumentException.class,
+        assertThrows(ConflictException.class,
                 () -> service.rejectRequest(requester.getId(), publishedEvent.getId(), request.getId()));
     }
 }

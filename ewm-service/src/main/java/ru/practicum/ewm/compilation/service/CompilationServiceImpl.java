@@ -12,9 +12,12 @@ import ru.practicum.ewm.compilation.model.Compilation;
 import ru.practicum.ewm.compilation.repository.CompilationRepository;
 import ru.practicum.ewm.event.model.Event;
 import ru.practicum.ewm.event.repository.EventRepository;
+import ru.practicum.ewm.exceptions.NotFoundException;
 
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.HashSet;
+import java.util.List;
+import java.util.NoSuchElementException;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -27,13 +30,13 @@ public class CompilationServiceImpl implements CompilationService {
     @Override
     @Transactional
     public CompilationDto create(NewCompilationDto dto) {
-        Set<Event> events = dto.getEvents() != null
-                ? new HashSet<>(eventRepository.findAllById(dto.getEvents()))
-                : new HashSet<>();
+        Set<Event> events = (dto.getEvents() == null || dto.getEvents().isEmpty())
+                ? new HashSet<>()
+                : new HashSet<>(eventRepository.findAllById(dto.getEvents()));
 
         Compilation compilation = Compilation.builder()
                 .title(dto.getTitle())
-                .pinned(Optional.ofNullable(dto.getPinned()).orElse(false))
+                .pinned(Boolean.TRUE.equals(dto.getPinned()))
                 .events(events)
                 .build();
 
@@ -43,6 +46,9 @@ public class CompilationServiceImpl implements CompilationService {
     @Override
     @Transactional
     public void delete(Long compId) {
+        if (!compilationRepository.existsById(compId)) {
+            throw new NotFoundException("Compilation not found");
+        }
         compilationRepository.deleteById(compId);
     }
 
@@ -55,13 +61,13 @@ public class CompilationServiceImpl implements CompilationService {
         if (dto.getTitle() != null) {
             compilation.setTitle(dto.getTitle());
         }
-
         if (dto.getPinned() != null) {
             compilation.setPinned(dto.getPinned());
         }
-
         if (dto.getEvents() != null) {
-            Set<Event> events = new HashSet<>(eventRepository.findAllById(dto.getEvents()));
+            Set<Event> events = dto.getEvents().isEmpty()
+                    ? new HashSet<>()
+                    : new HashSet<>(eventRepository.findAllById(dto.getEvents()));
             compilation.setEvents(events);
         }
 
@@ -78,16 +84,12 @@ public class CompilationServiceImpl implements CompilationService {
     @Override
     public List<CompilationDto> getAll(Boolean pinned, int from, int size) {
         PageRequest page = PageRequest.of(from / size, size);
-        List<Compilation> compilations;
-
-        if (pinned != null) {
-            compilations = compilationRepository.findAllByPinned(pinned, page);
-        } else {
-            compilations = compilationRepository.findAll(page).getContent();
-        }
+        List<Compilation> compilations = (pinned != null)
+                ? compilationRepository.findAllByPinned(pinned, page)
+                : compilationRepository.findAll(page).getContent();
 
         return compilations.stream()
                 .map(CompilationMapper::toDto)
-                .collect(Collectors.toList());
+                .toList();
     }
 }

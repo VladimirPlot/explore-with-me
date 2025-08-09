@@ -1,14 +1,15 @@
 package ru.practicum.service;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 import ru.practicum.dto.EndpointHitDto;
 import ru.practicum.dto.ViewStatsDto;
 import ru.practicum.model.EndpointHit;
 import ru.practicum.repository.StatsRepository;
 
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 @Service
@@ -16,8 +17,6 @@ import java.util.List;
 public class StatsServiceImpl implements StatsService {
 
     private final StatsRepository statsRepository;
-
-    private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     @Override
     public void saveHit(EndpointHitDto hitDto) {
@@ -31,20 +30,17 @@ public class StatsServiceImpl implements StatsService {
     }
 
     @Override
-    public List<ViewStatsDto> getStats(String start, String end, List<String> uris, Boolean unique) {
-        LocalDateTime startTime = LocalDateTime.parse(start, FORMATTER);
-        LocalDateTime endTime = LocalDateTime.parse(end, FORMATTER);
-
-        boolean isEmptyUris = uris == null || uris.isEmpty();
-
-        if (unique) {
-            return isEmptyUris
-                    ? statsRepository.findAllUniqueStatsWithoutUris(startTime, endTime)
-                    : statsRepository.findAllUniqueStatsWithUris(startTime, endTime, uris);
-        } else {
-            return isEmptyUris
-                    ? statsRepository.findAllStatsWithoutUris(startTime, endTime)
-                    : statsRepository.findAllStatsWithUris(startTime, endTime, uris);
+    public List<ViewStatsDto> getStats(LocalDateTime start, LocalDateTime end, List<String> uris, boolean unique) {
+        if (start.isAfter(end)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "start must be before end");
         }
+        if (uris != null && !uris.isEmpty()) {
+            return unique
+                    ? statsRepository.findAllUniqueStatsWithUris(start, end, uris)
+                    : statsRepository.findAllStatsWithUris(start, end, uris);
+        }
+        return unique
+                ? statsRepository.findAllUniqueStatsWithoutUris(start, end)
+                : statsRepository.findAllStatsWithoutUris(start, end);
     }
 }

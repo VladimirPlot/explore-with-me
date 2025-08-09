@@ -16,7 +16,7 @@ public class User {
     @SequenceGenerator(name = "user_seq", sequenceName = "user_sequence", allocationSize = 1)
     private Long id;
 
-    @Column(nullable = false, length = 64)
+    @Column(nullable = false, length = 250)
     private String name;
 
     @Column(nullable = false, unique = true, length = 254)

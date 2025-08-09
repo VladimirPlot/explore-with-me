@@ -17,6 +17,7 @@ import ru.practicum.ewm.event.model.Event;
 import ru.practicum.ewm.event.model.EventState;
 import ru.practicum.ewm.event.model.Location;
 import ru.practicum.ewm.event.repository.EventRepository;
+import ru.practicum.ewm.exceptions.NotFoundException;
 import ru.practicum.ewm.user.model.User;
 import ru.practicum.ewm.user.repository.UserRepository;
 
@@ -90,11 +91,93 @@ class EventServiceImplStatsTest {
         event.setState(EventState.PENDING);
         eventRepository.save(event);
 
-        var ex = assertThrows(IllegalArgumentException.class,
+        var ex = assertThrows(NotFoundException.class,
                 () -> eventService.getPublicEvent(event.getId(), "192.0.2.1", "/events/" + event.getId()));
 
         assertEquals("Event is not published", ex.getMessage());
+
         verify(statsClient, never()).hit(any());
         verify(statsClient, never()).getStats(any(), any(), any(), anyBoolean());
+    }
+
+    @Test
+    void getPublicEvent_shouldSetViewsZero_whenStatsEmpty() {
+        when(statsClient.getStats(any(), any(), any(), eq(true))).thenReturn(List.of());
+
+        EventFullDto dto = eventService.getPublicEvent(event.getId(), "192.0.2.1", "/events/" + event.getId());
+
+        assertEquals(0, dto.getViews());
+        verify(statsClient).hit(any());
+        verify(statsClient).getStats(any(), any(), eq(List.of("/events/" + event.getId())), eq(true));
+    }
+
+    @Test
+    void getPublicEvent_shouldUseFirstStatsEntry() {
+        var uri = "/events/" + event.getId();
+        when(statsClient.getStats(any(), any(), eq(List.of(uri)), eq(true)))
+                .thenReturn(List.of(
+                        new ViewStatsDto("ewm-service", uri, 123L),
+                        new ViewStatsDto("ewm-service", uri, 999L)
+                ));
+
+        EventFullDto dto = eventService.getPublicEvent(event.getId(), "ip", uri);
+
+        assertEquals(123L, dto.getViews());
+    }
+
+    @Test
+    void getPublicEvent_shouldPersistViewsOnEntity() {
+        var uri = "/events/" + event.getId();
+        when(statsClient.getStats(any(), any(), eq(List.of(uri)), eq(true)))
+                .thenReturn(List.of(new ViewStatsDto("ewm-service", uri, 7L)));
+
+        eventService.getPublicEvent(event.getId(), "ip", uri);
+
+        var refreshed = eventRepository.findById(event.getId()).orElseThrow();
+        assertEquals(7L, refreshed.getViews());
+    }
+
+    @Test
+    void getPublicEvent_shouldCallStatsWithExpectedArgs() {
+        var uri = "/events/" + event.getId();
+        when(statsClient.getStats(any(), any(), any(), eq(true))).thenReturn(List.of());
+
+        eventService.getPublicEvent(event.getId(), "203.0.113.7", uri);
+
+        verify(statsClient).hit(argThat(hit ->
+                "ewm-service".equals(hit.getApp()) &&
+                        uri.equals(hit.getUri()) &&
+                        "203.0.113.7".equals(hit.getIp()) &&
+                        hit.getTimestamp() != null
+        ));
+
+        verify(statsClient).getStats(
+                any(LocalDateTime.class),
+                any(LocalDateTime.class),
+                eq(List.of(uri)),
+                eq(true)
+        );
+    }
+
+    @Test
+    void getPublicEvent_shouldUsePassedUriAsStatsFilter() {
+        String customUri = "/custom/path/" + event.getId();
+        when(statsClient.getStats(any(), any(), eq(List.of(customUri)), eq(true)))
+                .thenReturn(List.of(new ViewStatsDto("ewm-service", customUri, 3L)));
+
+        EventFullDto dto = eventService.getPublicEvent(event.getId(), "ip", customUri);
+
+        assertEquals(3L, dto.getViews());
+        verify(statsClient).getStats(any(), any(), eq(List.of(customUri)), eq(true));
+    }
+
+    @Test
+    void getPublicEvent_shouldPropagateStatsClientError() {
+        var uri = "/events/" + event.getId();
+        when(statsClient.getStats(any(), any(), eq(List.of(uri)), eq(true)))
+                .thenThrow(new RuntimeException("stats down"));
+
+        assertThrows(RuntimeException.class,
+                () -> eventService.getPublicEvent(event.getId(), "ip", uri));
     }
 }

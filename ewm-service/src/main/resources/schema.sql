@@ -19,13 +19,13 @@ DROP TABLE IF EXISTS compilations;
 
 CREATE TABLE users (
     id BIGINT PRIMARY KEY DEFAULT nextval('user_sequence'),
-    name VARCHAR(64) NOT NULL,
+    name VARCHAR(250) NOT NULL,
     email VARCHAR(254) NOT NULL UNIQUE
 );
 
 CREATE TABLE categories (
     id BIGINT PRIMARY KEY DEFAULT nextval('category_sequence'),
-    name VARCHAR(64) NOT NULL UNIQUE
+    name VARCHAR(50) NOT NULL UNIQUE
 );
 
 CREATE TABLE events (
@@ -44,8 +44,8 @@ CREATE TABLE events (
     paid BOOLEAN NOT NULL,
     participant_limit INTEGER NOT NULL,
     request_moderation BOOLEAN NOT NULL,
-    views BIGINT NOT NULL,
-    confirmed_requests BIGINT NOT NULL,
+    views BIGINT NOT NULL DEFAULT 0,
+    confirmed_requests BIGINT NOT NULL DEFAULT 0,
 
     CONSTRAINT fk_event_user FOREIGN KEY (initiator_id) REFERENCES users(id),
     CONSTRAINT fk_event_category FOREIGN KEY (category_id) REFERENCES categories(id)
@@ -65,7 +65,7 @@ CREATE TABLE requests (
 
 CREATE TABLE compilations (
     id BIGINT PRIMARY KEY DEFAULT nextval('compilation_sequence'),
-    title VARCHAR(255) NOT NULL,
+    title VARCHAR(50) NOT NULL,
     pinned BOOLEAN DEFAULT FALSE
 );
 

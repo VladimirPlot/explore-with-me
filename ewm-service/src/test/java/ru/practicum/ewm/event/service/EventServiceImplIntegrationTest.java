@@ -17,13 +17,14 @@ import ru.practicum.ewm.event.model.Event;
 import ru.practicum.ewm.event.model.EventState;
 import ru.practicum.ewm.event.model.Location;
 import ru.practicum.ewm.event.repository.EventRepository;
+import ru.practicum.ewm.exceptions.ConflictException;
 import ru.practicum.ewm.user.model.User;
 import ru.practicum.ewm.user.repository.UserRepository;
 
 import java.time.LocalDateTime;
+import java.util.NoSuchElementException;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -152,90 +153,6 @@ class EventServiceImplIntegrationTest {
     }
 
     @Test
-    void shouldThrowWhenUserTriesToAccessOthersEvent() {
-        User otherUser = userRepository.save(new User(null, "Other User", "other@example.com"));
-        Event event = eventRepository.save(Event.builder()
-                .title("Foreign Event")
-                .annotation("Ann")
-                .description("Desc")
-                .eventDate(LocalDateTime.now().plusDays(3))
-                .location(new Location(1.0, 2.0))
-                .paid(false)
-                .participantLimit(0)
-                .requestModeration(true)
-                .createdOn(LocalDateTime.now())
-                .views(0L)
-                .confirmedRequests(0L)
-                .state(EventState.PENDING)
-                .initiator(otherUser)
-                .category(category)
-                .build());
-
-        var exception = org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
-                () -> eventService.getOwnEvent(user.getId(), event.getId()));
-
-        assertEquals("You are not the owner of this event.", exception.getMessage());
-    }
-
-    @Test
-    void shouldThrowWhenUpdatingPublishedEvent() {
-        Event publishedEvent = eventRepository.save(Event.builder()
-                .title("Published")
-                .annotation("Ann")
-                .description("Desc")
-                .eventDate(LocalDateTime.now().plusDays(3))
-                .location(new Location(1.0, 2.0))
-                .paid(false)
-                .participantLimit(0)
-                .requestModeration(true)
-                .createdOn(LocalDateTime.now())
-                .views(0L)
-                .confirmedRequests(0L)
-                .state(EventState.PUBLISHED)
-                .initiator(user)
-                .category(category)
-                .build());
-
-        UpdateEventUserRequest update = UpdateEventUserRequest.builder()
-                .title("New title")
-                .build();
-
-        var exception = org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
-                () -> eventService.updateOwnEvent(user.getId(), publishedEvent.getId(), update));
-
-        assertEquals("Cannot update published event", exception.getMessage());
-    }
-
-    @Test
-    void shouldThrowWhenUserTriesToUpdateOthersEvent() {
-        User otherUser = userRepository.save(new User(null, "Other", "other@example.com"));
-
-        Event event = eventRepository.save(Event.builder()
-                .title("Foreign")
-                .annotation("Ann")
-                .description("Desc")
-                .eventDate(LocalDateTime.now().plusDays(1))
-                .location(new Location(1.0, 2.0))
-                .paid(false)
-                .participantLimit(0)
-                .requestModeration(true)
-                .createdOn(LocalDateTime.now())
-                .views(0L)
-                .confirmedRequests(0L)
-                .state(EventState.PENDING)
-                .initiator(otherUser)
-                .category(category)
-                .build());
-
-        UpdateEventUserRequest update = UpdateEventUserRequest.builder().title("Hack").build();
-
-        var exception = org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
-                () -> eventService.updateOwnEvent(user.getId(), event.getId(), update));
-
-        assertEquals("User is not the initiator", exception.getMessage());
-    }
-
-    @Test
     void shouldPublishPendingEvent() {
         Event event = eventRepository.save(Event.builder()
                 .title("To Publish")
@@ -258,31 +175,6 @@ class EventServiceImplIntegrationTest {
 
         assertEquals(EventState.PUBLISHED, result.getState());
         assertNotNull(result.getPublishedOn());
-    }
-
-    @Test
-    void shouldThrowWhenPublishingNonPendingEvent() {
-        Event event = eventRepository.save(Event.builder()
-                .title("Already Published")
-                .annotation("A")
-                .description("D")
-                .eventDate(LocalDateTime.now().plusDays(3))
-                .location(new Location(1.0, 2.0))
-                .paid(false)
-                .participantLimit(0)
-                .requestModeration(true)
-                .createdOn(LocalDateTime.now())
-                .views(0L)
-                .confirmedRequests(0L)
-                .state(EventState.CANCELED) // не PENDING
-                .initiator(user)
-                .category(category)
-                .build());
-
-        var ex = org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
-                () -> eventService.publishEvent(event.getId()));
-
-        assertEquals("Only pending events can be published", ex.getMessage());
     }
 
     @Test
@@ -310,27 +202,239 @@ class EventServiceImplIntegrationTest {
     }
 
     @Test
-    void shouldThrowWhenRejectingPublishedEvent() {
-        Event event = eventRepository.save(Event.builder()
-                .title("Live Event")
-                .annotation("A")
-                .description("D")
+    void createEvent_shouldFail_whenDateTooSoon() {
+        NewEventDto dto = NewEventDto.builder()
+                .title("Soon")
+                .annotation("A".repeat(20))
+                .description("D".repeat(20))
+                .eventDate(LocalDateTime.now().plusMinutes(30))
+                .location(new LocationDto(1.0, 2.0))
+                .category(category.getId())
+                .build();
+
+        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                () -> eventService.createEvent(user.getId(), dto));
+    }
+
+    @Test
+    void createEvent_shouldApplyDefaults_whenNullableFields() {
+        NewEventDto dto = NewEventDto.builder()
+                .title("Defaults")
+                .annotation("A".repeat(20))
+                .description("D".repeat(20))
+                .eventDate(LocalDateTime.now().plusDays(1))
+                .location(new LocationDto(1.0, 2.0))
+                .category(category.getId())
+                .build();
+
+        EventFullDto created = eventService.createEvent(user.getId(), dto);
+
+        assertEquals(Boolean.FALSE, created.getPaid());
+        assertEquals(0, created.getParticipantLimit());
+        assertEquals(Boolean.TRUE, created.getRequestModeration());
+        assertEquals(EventState.PENDING, created.getState());
+    }
+
+    @Test
+    void createEvent_shouldFail_whenCategoryNotFound() {
+        NewEventDto dto = NewEventDto.builder()
+                .title("NoCat")
+                .annotation("A".repeat(20))
+                .description("D".repeat(20))
+                .eventDate(LocalDateTime.now().plusDays(1))
+                .location(new LocationDto(1.0, 2.0))
+                .category(999L)
+                .build();
+
+        assertThrows(NoSuchElementException.class,
+                () -> eventService.createEvent(user.getId(), dto));
+    }
+
+    @Test
+    void getOwnEvent_shouldFail_whenNotOwner() {
+        User other = userRepository.save(new User(null, "Other", "other@example.com"));
+        Event e = eventRepository.save(Event.builder()
+                .title("X").annotation("A").description("D")
                 .eventDate(LocalDateTime.now().plusDays(3))
                 .location(new Location(1.0, 2.0))
-                .paid(false)
-                .participantLimit(0)
-                .requestModeration(true)
-                .createdOn(LocalDateTime.now())
-                .views(0L)
-                .confirmedRequests(0L)
-                .state(EventState.PUBLISHED)
-                .initiator(user)
-                .category(category)
+                .paid(false).participantLimit(0).requestModeration(true)
+                .createdOn(LocalDateTime.now()).views(0L).confirmedRequests(0L)
+                .state(EventState.PENDING).initiator(other).category(category)
                 .build());
 
-        var ex = org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
-                () -> eventService.rejectEvent(event.getId()));
+        assertThrows(ConflictException.class,
+                () -> eventService.getOwnEvent(user.getId(), e.getId()));
+    }
 
-        assertEquals("Cannot reject published event", ex.getMessage());
+    @Test
+    void updateOwnEvent_shouldFail_whenPublished() {
+        Event e = eventRepository.save(Event.builder()
+                .title("T").annotation("A").description("D")
+                .eventDate(LocalDateTime.now().plusDays(3))
+                .location(new Location(1.0, 2.0))
+                .paid(false).participantLimit(0).requestModeration(true)
+                .createdOn(LocalDateTime.now()).views(0L).confirmedRequests(0L)
+                .state(EventState.PUBLISHED).initiator(user).category(category)
+                .build());
+
+        UpdateEventUserRequest dto = UpdateEventUserRequest.builder()
+                .title("New").build();
+
+        assertThrows(ru.practicum.ewm.exceptions.ConflictException.class,
+                () -> eventService.updateOwnEvent(user.getId(), e.getId(), dto));
+    }
+
+    @Test
+    void updateOwnEvent_shouldFail_whenNewDateTooSoon() {
+        Event e = eventRepository.save(Event.builder()
+                .title("T").annotation("A").description("D")
+                .eventDate(LocalDateTime.now().plusDays(3))
+                .location(new Location(1.0, 2.0))
+                .paid(false).participantLimit(0).requestModeration(true)
+                .createdOn(LocalDateTime.now()).views(0L).confirmedRequests(0L)
+                .state(EventState.PENDING).initiator(user).category(category)
+                .build());
+
+        UpdateEventUserRequest dto = UpdateEventUserRequest.builder()
+                .eventDate(LocalDateTime.now().plusMinutes(30)) // < +2h
+                .build();
+
+        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                () -> eventService.updateOwnEvent(user.getId(), e.getId(), dto));
+    }
+
+    @Test
+    void updateOwnEvent_shouldSendToReview_fromCanceledOrPending() {
+        Event canceled = eventRepository.save(Event.builder()
+                .title("T").annotation("A").description("D")
+                .eventDate(LocalDateTime.now().plusDays(3))
+                .location(new Location(1.0, 2.0))
+                .paid(false).participantLimit(0).requestModeration(true)
+                .createdOn(LocalDateTime.now()).views(0L).confirmedRequests(0L)
+                .state(EventState.CANCELED).initiator(user).category(category)
+                .build());
+
+        UpdateEventUserRequest dto = UpdateEventUserRequest.builder()
+                .stateAction(ru.practicum.ewm.event.model.StateActionUser.SEND_TO_REVIEW)
+                .build();
+
+        EventFullDto updated = eventService.updateOwnEvent(user.getId(), canceled.getId(), dto);
+        assertEquals(EventState.PENDING, updated.getState());
+    }
+
+    @Test
+    void updateOwnEvent_shouldCancelReview_onlyFromPending() {
+        Event pending = eventRepository.save(Event.builder()
+                .title("T").annotation("A").description("D")
+                .eventDate(LocalDateTime.now().plusDays(3))
+                .location(new Location(1.0, 2.0))
+                .paid(false).participantLimit(0).requestModeration(true)
+                .createdOn(LocalDateTime.now()).views(0L).confirmedRequests(0L)
+                .state(EventState.PENDING).initiator(user).category(category)
+                .build());
+
+        UpdateEventUserRequest dto = UpdateEventUserRequest.builder()
+                .stateAction(ru.practicum.ewm.event.model.StateActionUser.CANCEL_REVIEW)
+                .build();
+
+        EventFullDto updated = eventService.updateOwnEvent(user.getId(), pending.getId(), dto);
+        assertEquals(EventState.CANCELED, updated.getState());
+    }
+
+    @Test
+    void publishEvent_shouldFail_whenNotPending() {
+        Event e = eventRepository.save(Event.builder()
+                .title("T").annotation("A").description("D")
+                .eventDate(LocalDateTime.now().plusDays(3))
+                .location(new Location(1.0, 2.0))
+                .paid(false).participantLimit(0).requestModeration(true)
+                .createdOn(LocalDateTime.now()).views(0L).confirmedRequests(0L)
+                .state(EventState.CANCELED).initiator(user).category(category)
+                .build());
+
+        assertThrows(ConflictException.class, () -> eventService.publishEvent(e.getId()));
+    }
+
+    @Test
+    void rejectEvent_shouldFail_whenNotPending() {
+        Event e = eventRepository.save(Event.builder()
+                .title("T").annotation("A").description("D")
+                .eventDate(LocalDateTime.now().plusDays(3))
+                .location(new Location(1.0, 2.0))
+                .paid(false).participantLimit(0).requestModeration(true)
+                .createdOn(LocalDateTime.now()).views(0L).confirmedRequests(0L)
+                .state(EventState.CANCELED).initiator(user).category(category)
+                .build());
+
+        assertThrows(ru.practicum.ewm.exceptions.ConflictException.class,
+                () -> eventService.rejectEvent(e.getId()));
+    }
+
+    @Test
+    void cancelEventByUser_shouldCancel_whenPendingAndOwner() {
+        Event e = eventRepository.save(Event.builder()
+                .title("T").annotation("A").description("D")
+                .eventDate(LocalDateTime.now().plusDays(3))
+                .location(new Location(1.0, 2.0))
+                .paid(false).participantLimit(0).requestModeration(true)
+                .createdOn(LocalDateTime.now()).views(0L).confirmedRequests(0L)
+                .state(EventState.PENDING).initiator(user).category(category)
+                .build());
+
+        EventFullDto dto = eventService.cancelEventByUser(user.getId(), e.getId());
+        assertEquals(EventState.CANCELED, dto.getState());
+    }
+
+    @Test
+    void cancelEventByUser_shouldFail_whenNotOwner() {
+        User other = userRepository.save(new User(null, "Other", "other@example.com"));
+        Event e = eventRepository.save(Event.builder()
+                .title("T").annotation("A").description("D")
+                .eventDate(LocalDateTime.now().plusDays(3))
+                .location(new Location(1.0, 2.0))
+                .paid(false).participantLimit(0).requestModeration(true)
+                .createdOn(LocalDateTime.now()).views(0L).confirmedRequests(0L)
+                .state(EventState.PENDING).initiator(other).category(category)
+                .build());
+
+        assertThrows(ConflictException.class,
+                () -> eventService.cancelEventByUser(user.getId(), e.getId()));
+    }
+
+    @Test
+    void cancelEventByUser_shouldFail_whenNotPending() {
+        Event e = eventRepository.save(Event.builder()
+                .title("T").annotation("A").description("D")
+                .eventDate(LocalDateTime.now().plusDays(3))
+                .location(new Location(1.0, 2.0))
+                .paid(false).participantLimit(0).requestModeration(true)
+                .createdOn(LocalDateTime.now()).views(0L).confirmedRequests(0L)
+                .state(EventState.CANCELED).initiator(user).category(category)
+                .build());
+
+        assertThrows(ru.practicum.ewm.exceptions.ConflictException.class,
+                () -> eventService.cancelEventByUser(user.getId(), e.getId()));
+    }
+
+    @Test
+    void findOwnEvents_shouldPaginateWithOffset() {
+        for (int i = 0; i < 7; i++) {
+            eventRepository.save(Event.builder()
+                    .title("E" + i).annotation("A").description("D")
+                    .eventDate(LocalDateTime.now().plusDays(1))
+                    .location(new Location(1.0, 2.0))
+                    .paid(false).participantLimit(0).requestModeration(true)
+                    .createdOn(LocalDateTime.now()).views(0L).confirmedRequests(0L)
+                    .state(EventState.PENDING).initiator(user).category(category)
+                    .build());
+        }
+
+        var page1 = eventService.findOwnEvents(user.getId(), 0, 3);
+        var page2 = eventService.findOwnEvents(user.getId(), 3, 3);
+        var page3 = eventService.findOwnEvents(user.getId(), 6, 3);
+
+        assertEquals(3, page1.size());
+        assertEquals(3, page2.size());
+        assertEquals(1, page3.size());
     }
 }

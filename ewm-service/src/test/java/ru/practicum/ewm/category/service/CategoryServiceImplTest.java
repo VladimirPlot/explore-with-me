@@ -9,9 +9,9 @@ import ru.practicum.ewm.category.dto.CategoryDto;
 import ru.practicum.ewm.category.dto.NewCategoryDto;
 import ru.practicum.ewm.category.model.Category;
 import ru.practicum.ewm.category.repository.CategoryRepository;
+import ru.practicum.ewm.exceptions.NotFoundException;
 
 import java.util.List;
-import java.util.NoSuchElementException;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -50,7 +50,7 @@ class CategoryServiceImplTest {
     void update_shouldThrow_whenCategoryNotFound() {
         NewCategoryDto update = new NewCategoryDto("New");
 
-        assertThrows(NoSuchElementException.class,
+        assertThrows(NotFoundException.class,
                 () -> categoryService.update(999L, update));
     }
 
@@ -84,7 +84,29 @@ class CategoryServiceImplTest {
 
     @Test
     void findById_shouldThrow_whenNotFound() {
-        assertThrows(NoSuchElementException.class,
+        assertThrows(NotFoundException.class,
                 () -> categoryService.findById(404L));
+    }
+
+    @Test
+    void findAll_shouldHonorOffsetPaging() {
+        for (int i = 0; i < 7; i++) categoryRepository.save(new Category(null, "c" + i));
+
+        assertEquals(3, categoryService.findAll(0, 3).size());
+        assertEquals(3, categoryService.findAll(3, 3).size());
+        assertEquals(1, categoryService.findAll(6, 3).size());
+        assertTrue(categoryService.findAll(9, 3).isEmpty());
+    }
+
+    @Test
+    void delete_shouldNotThrow_whenIdNotExists() {
+        assertDoesNotThrow(() -> categoryService.delete(999L));
+    }
+
+    @Test
+    void update_shouldBeIdempotent_whenSameName() {
+        Category saved = categoryRepository.save(new Category(null, "Same"));
+        CategoryDto updated = categoryService.update(saved.getId(), new NewCategoryDto("Same"));
+        assertEquals("Same", updated.getName());
     }
 }

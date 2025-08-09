@@ -20,6 +20,7 @@ import ru.practicum.ewm.user.repository.UserRepository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -178,5 +179,94 @@ class CompilationServiceImplIntegrationTest {
         List<CompilationDto> pinnedOnly = compilationService.getAll(true, 0, 10);
         assertEquals(1, pinnedOnly.size());
         assertTrue(pinnedOnly.get(0).getPinned());
+    }
+
+    @Test
+    void create_shouldDefaultPinnedFalse_andAllowNullOrEmptyEvents() {
+        CompilationDto c1 = compilationService.create(NewCompilationDto.builder()
+                .title("No events")
+                .pinned(null)   // по умолчанию должно стать false
+                .events(null)
+                .build());
+        assertNotNull(c1.getId());
+        assertFalse(c1.getPinned());
+        assertEquals(0, c1.getEvents().size());
+
+        CompilationDto c2 = compilationService.create(NewCompilationDto.builder()
+                .title("Empty events")
+                .pinned(null)
+                .events(java.util.Set.of())
+                .build());
+        assertNotNull(c2.getId());
+        assertFalse(c2.getPinned());
+        assertEquals(0, c2.getEvents().size());
+    }
+
+    @Test
+    void create_shouldIncludeOnlyExistingEvents() {
+        Long missingId = 999999L;
+        CompilationDto dto = compilationService.create(NewCompilationDto.builder()
+                .title("Mixed")
+                .pinned(true)
+                .events(java.util.Set.of(event1.getId(), missingId))
+                .build());
+
+        assertEquals(1, dto.getEvents().size());
+        assertTrue(dto.getEvents().stream().anyMatch(e -> e.getId().equals(event1.getId())));
+    }
+
+    @Test
+    void update_shouldChangeOnlyProvidedFields() {
+        CompilationDto created = compilationService.create(NewCompilationDto.builder()
+                .title("Initial")
+                .pinned(false)
+                .events(java.util.Set.of(event1.getId()))
+                .build());
+
+        CompilationDto updated = compilationService.update(created.getId(),
+                UpdateCompilationRequest.builder().title("Renamed").build());
+
+        assertEquals("Renamed", updated.getTitle());
+        assertFalse(updated.getPinned()); // осталось прежним
+        assertEquals(1, updated.getEvents().size()); // осталось прежним
+    }
+
+    @Test
+    void update_shouldClearEvents_whenEmptySetProvided() {
+        CompilationDto created = compilationService.create(NewCompilationDto.builder()
+                .title("With events")
+                .pinned(false)
+                .events(java.util.Set.of(event1.getId(), event2.getId()))
+                .build());
+
+        CompilationDto updated = compilationService.update(created.getId(),
+                UpdateCompilationRequest.builder().events(java.util.Set.of()).build());
+
+        assertEquals(0, updated.getEvents().size());
+    }
+
+    @Test
+    void update_shouldThrow_whenCompilationNotFound() {
+        assertThrows(NoSuchElementException.class, () ->
+                compilationService.update(123456L,
+                        UpdateCompilationRequest.builder().title("x").build()));
+    }
+
+    @Test
+    void getById_shouldThrow_whenNotFound() {
+        assertThrows(NoSuchElementException.class, () -> compilationService.getById(777L));
+    }
+
+    @Test
+    void getAll_shouldPaginateByOffset() {
+        compilationService.create(NewCompilationDto.builder().title("A").pinned(false).events(Set.of()).build());
+        compilationService.create(NewCompilationDto.builder().title("B").pinned(false).events(Set.of()).build());
+        compilationService.create(NewCompilationDto.builder().title("C").pinned(true).events(Set.of()).build());
+
+        List<CompilationDto> page1 = compilationService.getAll(null, 0, 2);
+        List<CompilationDto> page2 = compilationService.getAll(null, 2, 2);
+
+        assertEquals(2, page1.size());
+        assertEquals(1, page2.size());
     }
 }

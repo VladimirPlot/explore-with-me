@@ -1,6 +1,8 @@
 package ru.practicum.ewm.request.service;
 
 import ru.practicum.ewm.request.dto.ParticipationRequestDto;
+import ru.practicum.ewm.request.dto.RequestStatusUpdateDto;
+import ru.practicum.ewm.request.dto.RequestStatusUpdateResult;
 
 import java.util.List;
 
@@ -17,4 +19,6 @@ public interface ParticipationRequestService {
     ParticipationRequestDto confirmRequest(Long userId, Long eventId, Long reqId);
 
     ParticipationRequestDto rejectRequest(Long userId, Long eventId, Long reqId);
+
+    RequestStatusUpdateResult updateRequestsStatus(Long userId, Long eventId, RequestStatusUpdateDto updateDto);
 }

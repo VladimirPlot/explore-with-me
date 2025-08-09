@@ -9,15 +9,18 @@ import ru.practicum.ewm.user.mapper.UserMapper;
 import ru.practicum.ewm.user.model.User;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 public class EventMapper {
+    private static final DateTimeFormatter DATE_TIME_FORMATTER =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     public static Event toEntity(NewEventDto dto, User initiator, Category category) {
         return Event.builder()
                 .title(dto.getTitle())
                 .annotation(dto.getAnnotation())
                 .description(dto.getDescription())
-                .eventDate(dto.getEventDate())
+                .eventDate(dto.getEventDate()) // Уже правильно - LocalDateTime
                 .location(toLocation(dto.getLocation()))
                 .paid(dto.getPaid())
                 .participantLimit(dto.getParticipantLimit())
@@ -38,7 +41,7 @@ public class EventMapper {
                 .title(event.getTitle())
                 .annotation(event.getAnnotation())
                 .description(event.getDescription())
-                .eventDate(event.getEventDate())
+                .eventDate(event.getEventDate()) // LocalDateTime -> LocalDateTime (корректно)
                 .createdOn(event.getCreatedOn())
                 .publishedOn(event.getPublishedOn())
                 .location(toLocationDto(event.getLocation()))
@@ -58,13 +61,17 @@ public class EventMapper {
                 .id(event.getId())
                 .title(event.getTitle())
                 .annotation(event.getAnnotation())
-                .eventDate(event.getEventDate().toString())
+                .eventDate(formatDateTime(event.getEventDate())) // Форматируем в строку
                 .paid(event.getPaid())
                 .confirmedRequests(event.getConfirmedRequests())
                 .views(event.getViews())
                 .category(CategoryMapper.toDto(event.getCategory()))
                 .initiator(UserMapper.toDto(event.getInitiator()))
                 .build();
+    }
+
+    private static String formatDateTime(LocalDateTime dateTime) {
+        return dateTime != null ? dateTime.format(DATE_TIME_FORMATTER) : null;
     }
 
     public static Location toLocation(LocationDto dto) {

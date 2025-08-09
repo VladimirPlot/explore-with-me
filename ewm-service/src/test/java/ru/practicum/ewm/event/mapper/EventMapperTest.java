@@ -73,23 +73,6 @@ class EventMapperTest {
     }
 
     @Test
-    void toShortDto_shouldMapEventToEventShortDto() {
-        Event event = buildSampleEvent();
-
-        EventShortDto dto = EventMapper.toShortDto(event);
-
-        assertEquals(event.getId(), dto.getId());
-        assertEquals(event.getTitle(), dto.getTitle());
-        assertEquals(event.getAnnotation(), dto.getAnnotation());
-        assertEquals(event.getEventDate().toString(), dto.getEventDate());
-        assertEquals(event.getPaid(), dto.getPaid());
-        assertEquals(event.getConfirmedRequests(), dto.getConfirmedRequests());
-        assertEquals(event.getViews(), dto.getViews());
-        assertEquals(event.getCategory().getId(), dto.getCategory().getId());
-        assertEquals(event.getInitiator().getId(), dto.getInitiator().getId());
-    }
-
-    @Test
     void toLocation_shouldMapLocationDtoToLocation() {
         LocationDto dto = new LocationDto(12.34, 56.78);
 

@@ -4,6 +4,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
 import lombok.RequiredArgsConstructor;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 import ru.practicum.ewm.event.dto.EventFullDto;
@@ -14,6 +15,7 @@ import ru.practicum.ewm.event.service.EventService;
 import java.time.LocalDateTime;
 import java.util.List;
 
+@Validated
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/events")
@@ -27,11 +29,9 @@ public class PublicEventController {
             @RequestParam(required = false) List<Long> categories,
             @RequestParam(required = false) Boolean paid,
             @RequestParam(required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
-            LocalDateTime rangeStart,
+            @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime rangeStart,
             @RequestParam(required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
-            LocalDateTime rangeEnd,
+            @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime rangeEnd,
             @RequestParam(defaultValue = "false") Boolean onlyAvailable,
             @RequestParam(defaultValue = "EVENT_DATE") EventSort sort,
             @RequestParam(defaultValue = "0") @PositiveOrZero int from,
@@ -40,17 +40,15 @@ public class PublicEventController {
     ) {
         return eventService.findPublic(
                 text, categories, paid,
-                rangeStart != null ? rangeStart.toString() : null,
-                rangeEnd != null ? rangeEnd.toString() : null,
+                rangeStart, rangeEnd,
                 onlyAvailable, sort, from, size,
                 request.getRemoteAddr(), request.getRequestURI()
         );
     }
 
     @GetMapping("/{id}")
-    public EventFullDto getEventById(@PathVariable Long id, HttpServletRequest request) {
-        String uri = request.getRequestURI();
-        String ip = request.getRemoteAddr();
-        return eventService.getPublicEvent(id, ip, uri);
+    public EventFullDto getEventById(@PathVariable("id") @Positive Long eventId,
+                                     HttpServletRequest request) {
+        return eventService.getPublicEvent(eventId, request.getRemoteAddr(), request.getRequestURI());
     }
 }
