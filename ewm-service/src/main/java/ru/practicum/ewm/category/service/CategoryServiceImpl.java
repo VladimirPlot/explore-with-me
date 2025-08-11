@@ -3,6 +3,7 @@ package ru.practicum.ewm.category.service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.ewm.category.dto.CategoryDto;
 import ru.practicum.ewm.category.dto.NewCategoryDto;
 import ru.practicum.ewm.category.mapper.CategoryMapper;
@@ -14,10 +15,12 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class CategoryServiceImpl implements CategoryService {
     private final CategoryRepository categoryRepository;
 
     @Override
+    @Transactional
     public CategoryDto create(NewCategoryDto dto) {
         Category entity = CategoryMapper.toEntity(dto);
         Category saved = categoryRepository.save(entity);
@@ -25,6 +28,7 @@ public class CategoryServiceImpl implements CategoryService {
     }
 
     @Override
+    @Transactional
     public CategoryDto update(Long id, NewCategoryDto dto) {
         Category category = categoryRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Category not found"));
@@ -33,6 +37,7 @@ public class CategoryServiceImpl implements CategoryService {
     }
 
     @Override
+    @Transactional
     public void delete(Long id) {
         categoryRepository.deleteById(id);
     }

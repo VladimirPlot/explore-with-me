@@ -11,7 +11,7 @@ import ru.practicum.ewm.errors.ErrorResponse;
 @ControllerAdvice
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler(MethodArgumentNotValidException.class)
+    @ExceptionHandler
     public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException ex) {
         String message = ex.getBindingResult().getFieldErrors().stream()
                 .map(error -> error.getField() + ": " + error.getDefaultMessage())
@@ -20,17 +20,12 @@ public class GlobalExceptionHandler {
         return buildResponse(message, HttpStatus.BAD_REQUEST);
     }
 
-    @ExceptionHandler(DataIntegrityViolationException.class)
-    public ResponseEntity<ErrorResponse> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
+    @ExceptionHandler({ConflictException.class, DataIntegrityViolationException.class})
+    public ResponseEntity<ErrorResponse> handleConflict(RuntimeException ex) {
         return buildResponse(ex.getMessage(), HttpStatus.CONFLICT);
     }
 
-    @ExceptionHandler(ConflictException.class)
-    public ResponseEntity<ErrorResponse> handleConflictException(ConflictException ex) {
-        return buildResponse(ex.getMessage(), HttpStatus.CONFLICT);
-    }
-
-    @ExceptionHandler(NotFoundException.class)
+    @ExceptionHandler
     public ResponseEntity<ErrorResponse> handleNotFound(NotFoundException ex) {
         return buildResponse(ex.getMessage(), HttpStatus.NOT_FOUND);
     }
