@@ -3,15 +3,18 @@ DROP SEQUENCE IF EXISTS category_sequence;
 DROP SEQUENCE IF EXISTS event_sequence;
 DROP SEQUENCE IF EXISTS request_sequence;
 DROP SEQUENCE IF EXISTS compilation_sequence;
+DROP SEQUENCE IF EXISTS comment_sequence;
 
 CREATE SEQUENCE user_sequence START WITH 1 INCREMENT BY 1;
 CREATE SEQUENCE category_sequence START WITH 1 INCREMENT BY 1;
 CREATE SEQUENCE event_sequence START WITH 1 INCREMENT BY 1;
 CREATE SEQUENCE request_sequence START WITH 1 INCREMENT BY 1;
 CREATE SEQUENCE compilation_sequence START WITH 1 INCREMENT BY 1;
+CREATE SEQUENCE comment_sequence START WITH 1 INCREMENT BY 1;
 
 DROP TABLE IF EXISTS compilation_events;
 DROP TABLE IF EXISTS requests;
+DROP TABLE IF EXISTS comments;
 DROP TABLE IF EXISTS events;
 DROP TABLE IF EXISTS categories;
 DROP TABLE IF EXISTS users;
@@ -62,6 +65,27 @@ CREATE TABLE requests (
     CONSTRAINT fk_request_user FOREIGN KEY (requester_id) REFERENCES users(id),
     CONSTRAINT uc_request_unique UNIQUE (event_id, requester_id)
 );
+
+CREATE TABLE comments (
+    id BIGINT PRIMARY KEY DEFAULT nextval('comment_sequence'),
+    event_id BIGINT NOT NULL,
+    author_id BIGINT NOT NULL,
+    text TEXT NOT NULL,
+    status VARCHAR(20) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT now(),
+    updated_at TIMESTAMP,
+    moderator_id BIGINT,
+    moderation_reason TEXT,
+
+    CONSTRAINT fk_comment_event     FOREIGN KEY (event_id)   REFERENCES events(id),
+    CONSTRAINT fk_comment_author    FOREIGN KEY (author_id)  REFERENCES users(id),
+    CONSTRAINT fk_comment_moderator FOREIGN KEY (moderator_id) REFERENCES users(id),
+    CONSTRAINT ck_comment_text_len CHECK (length(trim(text)) BETWEEN 1 AND 5000)
+);
+
+CREATE INDEX idx_comments_event_status_created_at ON comments(event_id, status, created_at DESC);
+CREATE INDEX idx_comments_author_created_at       ON comments(author_id, created_at DESC);
+CREATE INDEX idx_comments_status_created_at       ON comments(status, created_at DESC);
 
 CREATE TABLE compilations (
     id BIGINT PRIMARY KEY DEFAULT nextval('compilation_sequence'),
